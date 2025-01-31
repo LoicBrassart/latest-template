@@ -1,0 +1,109 @@
+x-baseService: &baseService
+  restart: always
+  healthcheck:
+    interval: 1s
+    timeout: 2s
+    retries: 10
+
+services:
+  gateway:
+    container_name: gateway
+    <<: *baseService
+    image: nginx
+    environment:
+      BACKEND_PORT: ${BACKEND_PORT}
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/dev.conf.template
+    ports:
+      - ${GATEWAY_PORT}:80
+    depends_on:
+      # backend:
+      #   condition: service_healthy
+      frontend:
+        condition: service_healthy
+      adminer:
+        condition: service_started
+    command: /bin/bash -c "envsubst '$$BACKEND_PORT' < /etc/nginx/conf.d/dev.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"
+
+  database:
+    container_name: database
+    <<: *baseService
+    image: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d ${DB_HOST} -U ${DB_USER}"]
+    volumes:
+      - ./persist/database:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_SCHEMA}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_HOST: ${DB_HOST}
+
+  adminer:
+    container_name: adminer
+    <<: *baseService
+    image: adminer
+    depends_on:
+      database:
+        condition: service_healthy
+
+  # backend:
+  #   container_name: backend
+  #   <<: *baseService
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile.dev
+  #   healthcheck:
+  #     test:
+  #       [
+  #         "CMD-SHELL",
+  #         'curl --fail -X POST -H ''Content-Type: application/json'' -d ''{"query":"query { __typename }"}'' http://backend:${BACKEND_PORT} || exit 1',
+  #       ]
+  #   depends_on:
+  #     database:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./backend/src:/app/src/
+  #   environment:
+  #     DB_PASSWORD: ${DB_PASSWORD}
+  #     DB_DATABASE: ${DB_SCHEMA}
+  #     DB_USER: ${DB_USER}
+  #     DB_HOST: ${DB_HOST}
+  #     JWT_SECRET: ${JWT_SECRET}
+  #     COOKIE_TTL: ${COOKIE_TTL}
+  #     BACKEND_PORT: ${BACKEND_PORT}
+
+  frontend:
+    container_name: frontend
+    <<: *baseService
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile.dev
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --fail --request GET --url 'http://frontend:5173' || exit 1",
+        ]
+    # depends_on:
+    #   codegen:
+    #     condition: service_completed_successfully
+    volumes:
+      - ../../frontend/src:/app/src/
+    # environment:
+    #   VITE_API_URL: ${VITE_API_URL}
+
+  # codegen:
+  #   <<: *baseService
+  #   restart: on-failure
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile.dev
+  #   depends_on:
+  #     backend:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./frontend/src:/app/src/
+  #   command: ["npm", "run", "codegen"]
+  #   environment:
+  #     VITE_API_URL: http://backend:4000
