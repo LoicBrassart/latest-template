@@ -10,8 +10,6 @@ services:
     container_name: gateway
     <<: *baseService
     image: nginx
-    environment:
-      BACKEND_PORT: ${BACKEND_PORT}
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/dev.conf.template
     ports:
@@ -23,7 +21,7 @@ services:
         condition: service_healthy
       adminer:
         condition: service_started
-    command: /bin/bash -c "envsubst '$$BACKEND_PORT' < /etc/nginx/conf.d/dev.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"
+    command: /bin/bash -c "envsubst '$$SERVICE_PORT' < /etc/nginx/conf.d/dev.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"
 
   database:
     container_name: database
@@ -43,6 +41,8 @@ services:
     container_name: adminer
     <<: *baseService
     image: adminer
+    # ports:
+    #   - ${SERVICE_PORT}:8080
     depends_on:
       database:
         condition: service_healthy
@@ -57,7 +57,7 @@ services:
   #     test:
   #       [
   #         "CMD-SHELL",
-  #         'curl --fail -X POST -H ''Content-Type: application/json'' -d ''{"query":"query { __typename }"}'' http://backend:${BACKEND_PORT} || exit 1',
+  #         'curl --fail -X POST -H ''Content-Type: application/json'' -d ''{"query":"query { __typename }"}'' http://backend:${SERVICE_PORT} || exit 1',
   #       ]
   #   depends_on:
   #     database:
@@ -71,7 +71,6 @@ services:
   #     DB_HOST: ${DB_HOST}
   #     JWT_SECRET: ${JWT_SECRET}
   #     COOKIE_TTL: ${COOKIE_TTL}
-  #     BACKEND_PORT: ${BACKEND_PORT}
 
   frontend:
     container_name: frontend
@@ -83,13 +82,15 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl --fail --request GET --url 'http://frontend:5173' || exit 1",
+          "curl --fail --request GET --url 'http://frontend:${SERVICE_PORT}' || exit 1",
         ]
     # depends_on:
     #   codegen:
     #     condition: service_completed_successfully
     volumes:
       - ../../frontend/src:/app/src/
+    environment:
+      VITE_SERVICE_PORT: ${SERVICE_PORT}
     # environment:
     #   VITE_API_URL: ${VITE_API_URL}
 

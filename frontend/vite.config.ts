@@ -10,5 +10,6 @@ export default defineConfig({
     hmr: {
       path: "hmr",
     },
+    port: 3000, //import.meta.env.VITE_SERVICE_HOST,
   },
 });
