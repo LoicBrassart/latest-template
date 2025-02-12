@@ -17,8 +17,8 @@ services:
     environment:
       SERVICE_PORT: ${SERVICE_PORT}
     depends_on:
-      # backend:
-      #   condition: service_healthy
+      backend:
+        condition: service_healthy
       frontend:
         condition: service_healthy
       adminer:
